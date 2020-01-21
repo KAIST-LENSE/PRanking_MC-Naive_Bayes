@@ -9,9 +9,10 @@ clear all;
 close all;
 clc;
 tic;
+format longG;
 %% [1] Initialize Parameters and Spaces
 % (a) Define # of Model Evaluation (# of MC sampling of Parameter Sets)
-n_sim = 5000;
+n_sim = 10000;
 
 % (b) Initialize Parameter Values for Key Parameters with kp
 %     The number of elements in kp should correspond to # of key parameters that are
@@ -89,7 +90,7 @@ end
 % target values so that there is some overlap between the kernel distributions
 % NOTE: Must be an array of n_out length
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-targets = [360, 32];                        
+targets = [1650, 2800];        %Unit Prod Cost, and Specific GWI                 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % (b) Generate Bayesian Classification Matrix
@@ -139,6 +140,7 @@ end
 S_KernelData = [];      % Temporary matrix with sample data for "success" kernel distr
 F_KernelData = [];      % Temporary matrix with sample data for "failure" kernel distr
 NBC_KDE_Rank = [];      % A n_kp x n_out matrix of column rank data
+
 
 % (b) Populate NBC_KDE_Rank matrix by evaluating the differences in the Bayesian PDFs
 for i = 1:n_kp
