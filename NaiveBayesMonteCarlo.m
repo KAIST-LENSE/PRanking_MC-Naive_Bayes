@@ -8,14 +8,12 @@ close all;
 clc;
 tic;
 format longG;
-progress = waitbar(0, 'Running...', 'Name', 'Running PR-MC-NaiveBayes...');
-set(findall(progress), 'Units', 'Normalized')
-set(progress, 'Position', [0.25, 0.4, 0.18, 0.12])
+progress = waitbar(0, 'Running...', 'Name', 'Running PR-MC-Sobol...');
 total_steps = 1000;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% [1] Initialize Parameters, Spaces, and Bayesian Targets
 % (a) Define # of Model Evaluation (# of MC sampling of Parameter Sets)
-n_sim = 100000;
+n_sim = 2500;
 export = 1;
 if n_sim > 50000
     simwarn = questdlg('WARNING: For n_sim >50,000 there could be issues with exporting results via xlswrite. Disable xlswrite?',...
@@ -57,6 +55,10 @@ n_kp = size(kp, 2);
 % (e) Define two identical parameter spaces for Sobol Analysis
 %     If n_kp params are simulated n_sim times, space is n_sim x n_kp 
 ParSpace = [];                 % Space for the Key Parameter of Interest
+
+% (f) Define Resolution of Kernel Distributions
+np_1 = 10000;               % Resolution for Parameter KDs for MC sampling
+np_2 = 50000;               % Resolution for Bayesian KDs for computing area difference
 
 %%Progress Bar%%
 waitbar(20/total_steps, progress, 'Generating Parameter Spaces...');
@@ -138,7 +140,7 @@ n_out = size(CCUS_Biocrude(kp),2);
 % (b) Evaluate CCU Model from MC Parameter Space
 %     For n_out outputs, we need n_sim*n_out evaluations of CCU model
 outputs = zeros(n_sim, n_out);
-for i = 1:n_sim
+parfor i = 1:n_sim
     % Each Parameter Set is a Row in the ParamSpace matrix
     Parameter_Set = ParSpace(i,:);   
     for j = 1:n_out
@@ -176,7 +178,7 @@ else
         targets(i) = str2double(answer{1});
     end
 end
-targets = [4.92, 3.33];   % Unit Prod Cost($/kg), Specific GWI(kg CO2eq/kg)              
+%targets = [4.92, 3.33];  % Unit Prod Cost($/kg), Specific GWI(kg CO2eq/kg)              
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % (b) Generate Bayesian Classification Matrix
@@ -189,7 +191,7 @@ targets = [4.92, 3.33];   % Unit Prod Cost($/kg), Specific GWI(kg CO2eq/kg)
 % is better the smaller the value. If the CCU model includes profitability 
 % metrics (ex: Revenue, Net Profit), the code below must be adjusted.
 classmat = zeros(n_sim, n_out);
-for i = 1:n_sim
+parfor i = 1:n_sim
     for j = 1:n_out
         if outputs(i,j) <= targets(j)
             classmat(i,j) = 1;
@@ -211,7 +213,7 @@ Failure_Mat = zeros(n_sim, n_kp, n_out);
 
 % (b) Loop through "classmat" then append values from ParamSpace to 
 %     Success_Mat or Failure_Mat accordingly
-for i = 1:n_sim
+parfor i = 1:n_sim
     for j = 1:n_out
         if classmat(i,j) == 1
             Success_Mat(i,:,j) = ParSpace(i,:);
@@ -235,7 +237,7 @@ NBC_KDE_Rank = zeros(n_kp, n_out);        % A n_kp x n_out matrix of ranks
 
 
 % (b) Populate NBC_KDE_Rank matrix by evaluating the differences
-for i = 1:n_kp
+parfor i = 1:n_kp
     for j = 1:n_out
         % Generate array of sample data for Bayesian Kernel Distributions
         S_KernelData = nonzeros(Success_Mat(:,i,j))';    
@@ -263,7 +265,7 @@ waitbar(950/total_steps, progress, 'Sorting Parameters by NBC-KDE Rank');
 
 %% [7] Rank Parameters and Export Data
 % (a) Rank Parameters by sorting the NBC-KDE matrix
-for i = 1:n_out
+parfor i = 1:n_out
     [score, rank] = sort(NBC_KDE_Rank(:,i), 'descend');
     fprintf('Parameters Ordered by NBC Rank for CCU Eval Output %.0f \n',i)
     rank
@@ -289,6 +291,7 @@ nbins = 30;             % Define resolution of output metric's historgram
     xlabel('Specific GWI, kg-CO2-eq/kg')
     ylabel('Frequency')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+targets
 
 % (c) Export Results
 %%Progress Bar%%
@@ -297,7 +300,7 @@ delete(progress)
 toc
 
 if export == 1
-    xlswrite('MC-NBC_ParameterSpace.xls', ParamSpace)
+    xlswrite('MC-NBC_ParameterSpace.xls', ParSpace)
     xlswrite('MC-NBC_EvaluatedOutputs.xls', outputs)
     xlswrite('MC-NBC_EvalMetricTargets.xls', targets)
     xlswrite('MC-NBC_ClassifiedOutputs.xls', classmat)
